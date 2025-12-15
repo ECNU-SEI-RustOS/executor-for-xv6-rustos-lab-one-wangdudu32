@@ -1,3 +1,29 @@
+static SYSCALL_NAMES: [&str; 23] = [
+    "",
+    "fork",
+    "exit",
+    "wait",
+    "pipe",
+    "read",
+    "kill",
+    "exec",
+    "fstat",
+    "chdir",
+    "dup",
+    "getpid",
+    "sbrk",
+    "sleep",
+    "uptime",
+    "open",
+    "write",
+    "mknod",
+    "unlink",
+    "link",
+    "mkdir",
+    "close",
+    "trace",
+];
+
 use array_macro::array;
 
 use alloc::boxed::Box;
@@ -381,6 +407,8 @@ pub struct Proc {
     pub data: UnsafeCell<ProcData>,
     /// 标识进程是否被杀死的原子布尔变量，用于调度和信号处理。
     pub killed: AtomicBool,
+
+    pub trace_mask: i32,
 }
 
 impl Proc {
@@ -390,6 +418,7 @@ impl Proc {
             excl: SpinLock::new(ProcExcl::new(), "ProcExcl"),
             data: UnsafeCell::new(ProcData::new()),
             killed: AtomicBool::new(false),
+            trace_mask: 0,
         }
     }
 
@@ -520,6 +549,7 @@ impl Proc {
             19 => self.sys_link(),
             20 => self.sys_mkdir(),
             21 => self.sys_close(),
+            22 => self.sys_trace(),
             _ => {
                 panic!("unknown syscall num: {}", a7);
             }
@@ -528,6 +558,19 @@ impl Proc {
             Ok(ret) => ret,
             Err(()) => -1isize as usize,
         };
+        if (self.trace_mask & (1 << a7)) != 0 {
+            let ret = match &sys_result {
+                Ok(r) => *r as isize,
+                Err(_) => -1,
+            };
+            println!(
+                "{}: syscall {} -> {}",
+                self.pid,
+                SYSCALL_NAMES[a7 as usize],
+                ret
+                );
+        }
+
     }
 
     /// # 功能说明
@@ -563,7 +606,7 @@ impl Proc {
         assert_eq!(guard.state, ProcState::RUNNING);
         guard.state = ProcState::RUNNABLE;
         guard = unsafe { CPU_MANAGER.my_cpu_mut().sched(guard,
-            self.data.get_mut().get_context()) };
+                                                        self.data.get_mut().get_context()) };
         drop(guard);
     }
 
@@ -615,7 +658,7 @@ impl Proc {
         unsafe {
             let c = CPU_MANAGER.my_cpu_mut();
             excl_guard = c.sched(excl_guard, 
-                &mut (*self.data.get()).context as *mut _);
+                                 &mut (*self.data.get()).context as *mut _);
         }
 
         excl_guard.channel = 0;
@@ -687,7 +730,7 @@ impl Proc {
         // clone opened files and cwd
         cdata.open_files.clone_from(&pdata.open_files);
         cdata.cwd.clone_from(&pdata.cwd);
-        
+
         // copy process name
         cdata.name.copy_from_slice(&pdata.name);
 
@@ -700,6 +743,8 @@ impl Proc {
         let mut cexcl = child.excl.lock();
         cexcl.state = ProcState::RUNNABLE;
         drop(cexcl);
+
+        child.trace_mask = self.trace_mask;
 
         Ok(cpid)
     }
@@ -857,7 +902,7 @@ impl Proc {
                 addr, 
                 &mut ret as *mut usize as *mut u8, 
                 mem::size_of::<usize>()
-            ) {
+                ) {
                 Ok(_) => Ok(ret),
                 Err(_) => Err("pagetable copy_in eror"),
             }

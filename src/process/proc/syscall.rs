@@ -498,6 +498,13 @@ impl Syscall for Proc {
         drop(file);
         Ok(0)
     }
+
+    pub fn sys_trace(&mut self) -> Result<usize, ()> {
+        let mask = self.arg_int(0)?;
+        self.trace_mask = mask;
+        Ok(0)
+    }
+
 }
 
 // LTODO - switch to macro that can include line numbers
