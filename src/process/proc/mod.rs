@@ -563,12 +563,14 @@ impl Proc {
                 Ok(r) => *r as isize,
                 Err(_) => -1,
             };
+            let pid = unsafe { (*self.data.get()).pid };
             println!(
                 "{}: syscall {} -> {}",
-                self.pid,
-                SYSCALL_NAMES[a7 as usize],
+                pid,
+                name,
                 ret
                 );
+
         }
 
     }

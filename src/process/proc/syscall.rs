@@ -263,7 +263,7 @@ impl Syscall for Proc {
 
     /// Get the process's pid.
     fn sys_getpid(&mut self) -> SysResult {
-        let pid = self.data.pid;
+        let pid = unsafe { (*self.data.get()).pid };
 
         #[cfg(feature = "trace_syscall")]
         println!("[{}].getpid() = {}", pid, pid);
@@ -370,7 +370,7 @@ impl Syscall for Proc {
 
         #[cfg(feature = "trace_syscall")]
         println!("[{}].mknod(path={}, major={}, minor={}) = {:?}",
-            self.excl.lock().pid, String::from_utf8_lossy(&path), major, minor, ret);
+        self.excl.lock().pid, String::from_utf8_lossy(&path), major, minor, ret);
 
         let ret = ret.map(|inode| {drop(inode);0});
         LOG.end_op();
@@ -460,8 +460,8 @@ impl Syscall for Proc {
 
         #[cfg(feature = "trace_syscall")]
         println!("[{}].link(old_path={}, new_path={})", self.excl.lock().pid,
-            String::from_utf8_lossy(&old_path), String::from_utf8_lossy(&new_path));
-        
+        String::from_utf8_lossy(&old_path), String::from_utf8_lossy(&new_path));
+
         Ok(0)
     }
 
@@ -501,7 +501,7 @@ impl Syscall for Proc {
     }
 
     fn sys_trace(&mut self) -> Result<usize, ()> {
-        let mask = self.arg_i32(0)?;
+        let mask = self.arg_i32(0);
         self.trace_mask = mask;
         Ok(0)
     }
