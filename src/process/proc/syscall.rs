@@ -263,7 +263,7 @@ impl Syscall for Proc {
 
     /// Get the process's pid.
     fn sys_getpid(&mut self) -> SysResult {
-        let pid = self.excl.lock().pid;
+        let pid = self.data.pid;
 
         #[cfg(feature = "trace_syscall")]
         println!("[{}].getpid() = {}", pid, pid);
