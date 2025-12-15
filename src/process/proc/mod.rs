@@ -563,7 +563,9 @@ impl Proc {
                 Ok(r) => *r as isize,
                 Err(_) => -1,
             };
-            let pid = unsafe { (*self.data.get()).pid };
+            let pid = self.index;
+            let name = SYSCALL_NAMES[num];
+
             println!(
                 "{}: syscall {} -> {}",
                 pid,
